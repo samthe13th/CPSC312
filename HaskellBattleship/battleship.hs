@@ -4,7 +4,7 @@ module Battleship where
   import System.Random
   import Data.List.Split
 
-  blankGrid = ["~~X~~~~~~~","~X~~~~~~~X","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~"]
+  blankGrid = ["~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~"]
   computerStart = ["~0~~~~~~~~","~0~~~3~~~~","~0~~~~111~","~0~~~~~~~5","~~~44~~~~5","~~~~~~~2~~","~~~~~~~2~~","~~9~~~~2~~","~~~~~8~~~~","~66~~~~~7~"]
   playerStart = ["~~~~111~~~","~~~~~~~~6~","~3~7~~~~~~","~3~~~~44~~","~~~~~~~~~~","~~8~~~~~0~","55~~~~~~0~","~~~~9~2~0~","~~~~~~2~0~","~~~~~~2~~~"]
   title = "\n  ____    _  _____ _____ _     _____ ____  _   _ ___ ____ \n | __ )  / \\|_   _|_   _| |   | ____/ ___|| | | |_ _|  _ \\ \n |  _ \\ / _ \\ | |   | | | |   |  _| \\___ \\| |_| || || |_) | \n | |_) / ___ \\| |   | | | |___| |___ ___) |  _  || ||  __/ \n |____/_/   \\_\\_|   |_| |_____|_____|____/|_| |_|___|_| \n\n                    By Sam and Regina\n\n"
@@ -84,14 +84,6 @@ module Battleship where
     | (elem h "ABCDEFGHIJabcdefghij") && (elem t ["1","2","3","4","5","6","7","8","9","10"]) = True
     | otherwise = False
 
-{--
-  strategyMove g (r,i)
-    | marked g ((r + 1), i) = coinToss g ((r - 1), i) ((r + 2), i)
-    | marked g ((r - 1), i) = coinToss g ((r + 1), i) ((r - 2), i)
-    | marked g (r,(i + 1)) = coinToss g (r,(i - 1)) (r,(i + 2))
-    | marked g (r,(i - 1)) = coinToss g (r,(i + 1)) (r,(i - 2))
-    | otherwise = strategicRandom g (r,i) -}
-
   computerPlay cGrid pGrid fb p c strategy =
     do
       (r,i) <- (if strategy == "random" then (randomCoords pGrid) else (strategyCoords strategy pGrid))
@@ -117,14 +109,25 @@ module Battleship where
   strategyCoords coords g =
     do
       let coord = read coords :: (Int,Int)
-      newCoord <- guess coord g
+      newCoord <- smartMove coord g
       return newCoord
 
-  guess (r,i) g =
+  smartMove (r,i) g
+    | hit ((r + 1),i) g && open ((r - 1),i) g = return ((r - 1),i)
+    | hit ((r + 1),i) g && open ((r + 2),i) g = return ((r + 2),i)
+    | hit ((r - 1),i) g && open ((r + 1),i) g = return ((r + 1),i)
+    | hit ((r - 1),i) g && open ((r - 2),i) g = return ((r - 2),i)
+    | hit (r,(i + 1)) g && open (r,(i - 1)) g = return (r,(i - 1))
+    | hit (r,(i + 1)) g && open (r,(i + 2)) g = return (r,(i + 2))
+    | hit (r,(i - 1)) g && open (r,(i + 1)) g = return (r,(i + 1))
+    | hit (r,(i - 1)) g && open (r,(i - 2)) g = return (r,(i - 2))
+    | otherwise = guess4 (r,i) g
+
+  guess4 (r,i) g =
     do
       random4 <- (randNum 3)
       let option = getOption (r,i) random4
-      if (open option g) then return option else (guess (r,i) g)
+      if (open option g) then return option else (guess4 (r,i) g)
 
   getOption (r,i) x
     | x == 0 = ((r + 1), i)
@@ -132,8 +135,8 @@ module Battleship where
     | x == 2 = (r, (i + 1))
     | x == 3 = (r, (i - 1))
 
+  hit (r,i) g = if ((legal (r,i)) && ((g !! r) !! i) == 'X') then True else False
   open (r,i) g = if (legal (r,i) && not (elem ((g !! r) !! i) "X/")) then True else False
-
   legal (r,i) = if (r >= 0 && r <= 9 && i >= 0 && i <= 9) then True else False
 
   row grid 9 i = (show 10) ++ (renderRow (grid !! 9) i) ++ "\n"
@@ -167,7 +170,7 @@ module Battleship where
     | elem ((grid !! r) !! i) "0123456789X" = "HIT!"
     | otherwise = "MISS"
 
-  getCoordinates (h:t) = ((digitToInt(convert h)),((read t :: Int) - 1))
+  getCoordinates (h:t) = (((read t :: Int) - 1),(digitToInt(convert h)))
 
   convert x
     | (toUpper x) == 'A' = '0'
