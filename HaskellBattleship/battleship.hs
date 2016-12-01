@@ -4,7 +4,7 @@ module Battleship where
   import System.Random
   import Data.List.Split
 
-  blankGrid = ["~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~"]
+  blankGrid = ["~~X~~~~~~~","~X~~~~~~~X","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~","~~~~~~~~~~"]
   computerStart = ["~0~~~~~~~~","~0~~~3~~~~","~0~~~~111~","~0~~~~~~~5","~~~44~~~~5","~~~~~~~2~~","~~~~~~~2~~","~~9~~~~2~~","~~~~~8~~~~","~66~~~~~7~"]
   playerStart = ["~~~~111~~~","~~~~~~~~6~","~3~7~~~~~~","~3~~~~44~~","~~~~~~~~~~","~~8~~~~~0~","55~~~~~~0~","~~~~9~2~0~","~~~~~~2~0~","~~~~~~2~~~"]
   title = "\n  ____    _  _____ _____ _     _____ ____  _   _ ___ ____ \n | __ )  / \\|_   _|_   _| |   | ____/ ___|| | | |_ _|  _ \\ \n |  _ \\ / _ \\ | |   | | | |   |  _| \\___ \\| |_| || || |_) | \n | |_) / ___ \\| |   | | | |___| |___ ___) |  _  || ||  __/ \n |____/_/   \\_\\_|   |_| |_____|_____|____/|_| |_|___|_| \n\n                    By Sam and Regina\n\n"
@@ -25,7 +25,7 @@ module Battleship where
   setUp grid p c s 10 =
     do
       print "done set up"
-      personPlay computerStart grid "" "" p c "(10,10)"
+      personPlay computerStart grid "" "" p c "random"
 
   setUp grid p c s acc =
     do
@@ -38,7 +38,7 @@ module Battleship where
         then
           do
             putStrLn "Auto set-up"
-            personPlay computerStart playerStart "" "" p c "(10,10)"
+            personPlay computerStart playerStart "" "" p c "random"
         else
           do
             let pShip = parseShip ship s
@@ -56,7 +56,7 @@ module Battleship where
           then (down (ship !! 0) size)
           else (right (ship !! 0) size)
 
-  personPlay cGrid pGrid fb1 fb2 p c cMove=
+  personPlay cGrid pGrid fb1 fb2 p c st =
     do
       putStrLn ((drawBoard cGrid "computer") ++ divider ++ (drawBoard pGrid "human"))
       putStrLn fb1
@@ -64,93 +64,85 @@ module Battleship where
       putStrLn ("\n" ++ p ++ "'s move: Enter coordinates to fire on! (eg 'A1')")
       line <- getLine
       if (checkInput line)
-        then (continue cGrid pGrid fb1 fb2 p c line cMove)
+        then (continue cGrid pGrid fb1 fb2 p c line st)
         else (newInput cGrid pGrid fb1 fb2 p c)
 
   newInput cGrid pGrid fb1 fb2 p c =
     do
       putStrLn "Please enter coordinates in the following form: 'A1'"
       line <- getLine
-      if (checkInput line) then (continue cGrid pGrid fb1 fb2 p c line "") else (newInput cGrid pGrid fb1 fb2 p c)
+      if (checkInput line) then (continue cGrid pGrid fb1 fb2 p c line "random") else (newInput cGrid pGrid fb1 fb2 p c)
 
-  continue cGrid pGrid fb1 fb2 p c line cMove =
+  continue cGrid pGrid fb1 fb2 p c line strategy =
     do
       let (a,b) = getCoordinates line
       let newGrid = attack cGrid (getCoordinates line) 0
       let fb = (hitOrMiss cGrid (a,b)) ++ (isSunk (getCoordinates line) cGrid newGrid "human" c) ++ (endGame newGrid "human" p)
-      computerPlay newGrid pGrid fb p c cMove
+      computerPlay newGrid pGrid fb p c strategy
 
   checkInput (h:t)
     | (elem h "ABCDEFGHIJabcdefghij") && (elem t ["1","2","3","4","5","6","7","8","9","10"]) = True
     | otherwise = False
 
-  computerPlay cGrid pGrid fb p c cMove =
-      if cMove == "(10,10)"
-        then
-          do
-            r <- randNum 10
-            r2 <- randNum 10
-            let i = fromIntegral r :: Int
-            let i2 = fromIntegral r2 :: Int
-            let fb1 = "Firing... " ++ fb
-            if tried pGrid (i,i2) then putStrLn ("tried " ++ show (i,i2)) else putStrLn ("Haven't tried" ++ show (i,i2))
-            let newGrid = (attack pGrid (i,i2) 0)
-            let hitMiss = hitOrMiss pGrid (i,i2)
-            let sunkStatus = isSunk (i,i2) pGrid newGrid "computer" c
-            let fb2 = c ++ "'s move: " ++ hitMiss ++ sunkStatus ++ (endGame newGrid "computer" c)
-            putStrLn ("newMove: " ++ show (i,i2))
-            personPlay cGrid newGrid fb1 fb2 p c (recordMove newGrid (read cMove :: (Int,Int)) (i,i2) hitMiss sunkStatus)
-        else
-          do
-            print "move strategy"
-            print cMove
-            putStrLn ("newMove: " ++ (show cMove))
-            newMove <- strategyMove pGrid (read cMove :: (Int,Int))
-            let fb1 = "Firing... " ++ fb
-            let newGrid = (attack pGrid newMove 0)
-            let hitMiss = hitOrMiss pGrid newMove
-            let sunkStatus = isSunk newMove pGrid newGrid "computer" c
-            let fb2 = c ++ "'s move: " ++ hitMiss ++ sunkStatus ++ (endGame newGrid "computer" c)
-            personPlay cGrid newGrid fb1 fb2 p c (recordMove newGrid (read cMove :: (Int,Int)) newMove hitMiss sunkStatus)
-
-  recordMove grid (r0,i0) (r,i) hm ss
-    | (hm == "HIT!") && (ss == "") = show (r,i)
-    | (legal grid (r0,i0)) && ((grid !! r) !! i) == '/' && ((grid !! r0) !! i0) == 'X' = show (r0,i0)
-    | otherwise = "(10,10)"
-
-  tried g (r,i) = if (elem ((g !! r) !! i) "X/") then True else False
-
+{--
   strategyMove g (r,i)
     | marked g ((r + 1), i) = coinToss g ((r - 1), i) ((r + 2), i)
     | marked g ((r - 1), i) = coinToss g ((r + 1), i) ((r - 2), i)
     | marked g (r,(i + 1)) = coinToss g (r,(i - 1)) (r,(i + 2))
     | marked g (r,(i - 1)) = coinToss g (r,(i + 1)) (r,(i - 2))
-    | otherwise = strategicRandom g (r,i)
+    | otherwise = strategicRandom g (r,i) -}
 
-  marked g (r,i) = if (legal g (r,i)) && (((g !! r) !! i) == 'X') then True else False
-  legal g (r,i) = if r >= 0 && r < 10 && i >= 0 && i < 10 then True else False
-  coinToss g op1 op2 = if legal g op1 && not (marked g op1) then return op1 else return op2
-
-  strategicRandom g (r,i) =
+  computerPlay cGrid pGrid fb p c strategy =
     do
-      n <- randNum 4
-      let d = fromIntegral n :: Int
-      print d
-      if (d == 0) && legal g ((r + 1), i)
-        then return ((r + 1),i)
-        else if (d == 1) && legal g ((r - 1), i)
-          then return ((r - 1),i)
-          else if (d == 2) && legal g (r,(i + 1))
-            then return (r, (i + 1))
-            else return (r, (i - 1))
+      (r,i) <- (if strategy == "random" then (randomCoords pGrid) else (strategyCoords strategy pGrid))
+      let fb1 = "Firing... " ++ fb
+      let newGrid = (attack pGrid (r,i) 0)
+      let fb2 = c ++ "'s move: " ++ (hitOrMiss pGrid (r,i)) ++ (isSunk (r,i) pGrid newGrid "computer" c) ++ (endGame newGrid "computer" c)
+      newStrategy <- getStrategy strategy pGrid (r,i) newGrid
+      personPlay cGrid newGrid fb1 fb2 p c newStrategy
+
+  getStrategy strategy pGrid (r,i) ng
+    | ((ng !! r) !! i) == 'X' && (isSunk (r,i) pGrid ng "computer" "any") == "" = return (show (r,i))
+    | strategy == "random" || (isSunk (r,i) pGrid ng "computer" "any") /= "" = return "random"
+    | otherwise = return strategy
+
+  randomCoords g =
+    do
+      r <- randNum 9
+      r2 <- randNum 9
+      let i = fromIntegral r :: Int
+      let i2 = fromIntegral r2 :: Int
+      if (open (i,i2) g) then return (i,i2) else randomCoords g
+
+  strategyCoords coords g =
+    do
+      let coord = read coords :: (Int,Int)
+      newCoord <- guess coord g
+      return newCoord
+
+  guess (r,i) g =
+    do
+      random4 <- (randNum 3)
+      let option = getOption (r,i) random4
+      if (open option g) then return option else (guess (r,i) g)
+
+  getOption (r,i) x
+    | x == 0 = ((r + 1), i)
+    | x == 1 = ((r - 1), i)
+    | x == 2 = (r, (i + 1))
+    | x == 3 = (r, (i - 1))
+
+  open (r,i) g = if (legal (r,i) && not (elem ((g !! r) !! i) "X/")) then True else False
+
+  legal (r,i) = if (r >= 0 && r <= 9 && i >= 0 && i <= 9) then True else False
 
   row grid 9 i = (show 10) ++ (renderRow (grid !! 9) i) ++ "\n"
   row grid n i = " " ++ (show (n + 1)) ++ (renderRow (grid !! n) i)++ "\n" ++ row grid (n + 1) i
 
   attack [] _ _ = []
-  attack (h:t) (i,r) acc
-    | acc == r = (updateRow h i 0):attack t (i,r) (acc + 1)
-    | otherwise = h:attack t (i,r) (acc + 1)
+  attack (h:t) (r,i) acc
+    | acc == r = (updateRow h i 0):attack t (r,i) (acc + 1)
+    | otherwise = h:attack t (r,i) (acc + 1)
 
   updateRow [] _ _ = []
   updateRow (h:t) i acc
@@ -171,7 +163,7 @@ module Battleship where
 
   drawBoard g i = abc ++ (row g 0 i)
 
-  hitOrMiss grid (i,r)
+  hitOrMiss grid (r,i)
     | elem ((grid !! r) !! i) "0123456789X" = "HIT!"
     | otherwise = "MISS"
 
@@ -189,13 +181,13 @@ module Battleship where
     | (toUpper x)  == 'I' = '8'
     | (toUpper x)  == 'J' = '9'
 
-  randNum range =
+  randNum n =
     do
       g <- newStdGen
-      let (x,s) = randomR (0,(range - 1)) g :: (Int,StdGen)
+      let (x,s) = randomR (0,n) g :: (Int,StdGen)
       return x
 
-  isSunk (i,r) g0 g player c
+  isSunk (r,i) g0 g player c
     | elem ((g0 !! r) !! i) [e | v <- g, e <- v] = ""
     | otherwise = outputSunkText player c
 
@@ -214,21 +206,21 @@ module Battleship where
   addShips (h:t) grid n = addShips t (addShip grid h 0 n) n
 
   addShip [] _ _ n = []
-  addShip (h:t) (i,r) acc n
-    | r == acc = (addShipPart h i 0 n):addShip t (i,r) (acc + 1) n
-    | otherwise = h:(addShip t (i,r) (acc + 1)) n
+  addShip (h:t) (r,i) acc n
+    | r == acc = (addShipPart h i 0 n):addShip t (r,i) (acc + 1) n
+    | otherwise = h:(addShip t (r,i) (acc + 1)) n
 
   addShipPart [] _ _ n = []
   addShipPart (h:t) i acc n
     | i == acc = n:addShipPart t i (acc + 1) n
     | otherwise = h:addShipPart t i (acc + 1) n
 
-  down start n =
+  right start n =
     do
       let (x1,y1) = getCoordinates start
       [(x,y) | x <- [x1], y <- [y1..(y1 + (n - 1))]]
 
-  right start n =
+  down start n =
     do
       let (x1,y1) = getCoordinates start
       [(x,y) | x <- [x1..(x1 + (n - 1))], y <- [y1]]
