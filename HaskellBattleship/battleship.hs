@@ -41,11 +41,29 @@ module Battleship where
             personPlay computerStart playerStart "" "" p c "random"
         else
           do
-            let pShip = parseShip ship s
-            let newGrid = (addShips pShip grid (head $ show acc))
-            putStrLn (drawBoard newGrid "human")
-            print acc
-            setUp newGrid p c (if (acc < 2) then 3 else if (acc < 5) then 2 else 1) (acc + 1)
+            validation <- validateShip ship s grid
+            if (validation)
+              then
+                do
+                  let pShip = parseShip ship s
+                  let newGrid = (addShips pShip grid (head $ show acc))
+                  putStrLn (drawBoard newGrid "human")
+                  setUp newGrid p c (if (acc < 2) then 3 else if (acc < 5) then 2 else 1) (acc + 1)
+              else
+                do
+                  putStrLn (drawBoard grid "human")
+                  putStrLn "ENTRY NOT VALID \n\n"
+                  setUp grid p c s acc
+
+  validateShip ship size grid =
+    do
+      let shipList = splitOn " " ship
+      if (length shipList /= 2) then (return False)
+      else if (not (checkInput (shipList !! 0) && elem (shipList !! 1) ["down","right"]))
+        then (return False)
+      else if (not (checkShipPlaces (parseShip ship size) grid))
+        then (return False)
+        else (return True)
 
   parseShip (h:t) size =
     do
@@ -137,6 +155,7 @@ module Battleship where
 
   hit (r,i) g = if ((legal (r,i)) && ((g !! r) !! i) == 'X') then True else False
   open (r,i) g = if (legal (r,i) && not (elem ((g !! r) !! i) "X/")) then True else False
+  water (r,i) g = if ((legal (r,i)) && ((g !! r) !! i) == '~') then True else False
   legal (r,i) = if (r >= 0 && r <= 9 && i >= 0 && i <= 9) then True else False
 
   row grid 9 i = (show 10) ++ (renderRow (grid !! 9) i) ++ "\n"
@@ -207,6 +226,11 @@ module Battleship where
 
   addShips [] grid n = grid
   addShips (h:t) grid n = addShips t (addShip grid h 0 n) n
+
+  checkShipPlaces (h:t) grid = foldr (&&) True (checkShipPlace (h:t) grid)
+
+  checkShipPlace [] _ = []
+  checkShipPlace (h:t) grid = (water h grid : checkShipPlace t grid)
 
   addShip [] _ _ n = []
   addShip (h:t) (r,i) acc n
